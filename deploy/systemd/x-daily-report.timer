@@ -1,0 +1,9 @@
+[Unit]
+Description=X Daily: every morning 08:00 (Asia/Shanghai)
+
+[Timer]
+OnCalendar=*-*-* 08:00:00 Asia/Shanghai
+Persistent=true
+
+[Install]
+WantedBy=timers.target

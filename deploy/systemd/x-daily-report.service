@@ -1,0 +1,15 @@
+[Unit]
+Description=X Daily: collect yesterday, then write and send the digest
+Wants=x-daily-rsshub.service
+After=x-daily-rsshub.service
+
+[Service]
+Type=oneshot
+WorkingDirectory=%h/projects/X_Daily
+Environment=PATH=%h/.local/bin:/usr/local/bin:/usr/bin:/bin
+# user@host of the VPS that holds the WeCom secret and runs wecom/receive.py
+Environment=WECOM_RELAY=user@your-vps
+TimeoutStartSec=3h
+ExecStartPre=/bin/sleep 20
+ExecStart=%h/projects/X_Daily/.venv/bin/python radar.py
+ExecStart=%h/projects/X_Daily/.venv/bin/python digest.py --send

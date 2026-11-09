@@ -1,0 +1,89 @@
+{
+  "not_covered": [
+    "X：共 41 个账号；纯转发和回复别人的贴文不抓；Lilian Weng 自 7 月起没有新帖，只跟踪她的博客；Chollet 多为付费贴文，未跟踪",
+    "企业官方博客不再单独跟踪，只看它们的 X 账号"
+  ],
+  "sources": [
+    {"name": "X: @karpathy", "type": "x", "kind": "x", "coverage": "X 原帖（RSSHub，非官方）", "handle": "karpathy"},
+    {"name": "X: @simonw", "type": "x", "kind": "x", "coverage": "X 原帖（RSSHub，非官方）", "handle": "simonw"},
+    {"name": "X: @polynoamial", "type": "x", "kind": "x", "coverage": "X 原帖（RSSHub，非官方）", "handle": "polynoamial"},
+    {"name": "X: @ShunyuYao12", "type": "x", "kind": "x", "coverage": "X 原帖（RSSHub，非官方）", "handle": "ShunyuYao12"},
+    {"name": "X: @_jasonwei", "type": "x", "kind": "x", "coverage": "X 原帖（RSSHub，非官方）", "handle": "_jasonwei"},
+    {"name": "X: @HarmonicMath", "type": "x", "kind": "x", "coverage": "X 原帖（RSSHub，非官方）", "handle": "HarmonicMath"},
+    {"name": "X: @axiommathai", "type": "x", "kind": "x", "coverage": "X 原帖（RSSHub，非官方）", "handle": "axiommathai"},
+    {"name": "X: @arcprize", "type": "x", "kind": "x", "coverage": "X 原帖（RSSHub，非官方）", "handle": "arcprize"},
+    {"name": "X: @natolambert", "type": "x", "kind": "x", "coverage": "X 原帖（RSSHub，非官方）", "handle": "natolambert"},
+    {"name": "X: @sayashk", "type": "x", "kind": "x", "coverage": "X 原帖（RSSHub，非官方）", "handle": "sayashk"},
+    {"name": "X: @random_walker", "type": "x", "kind": "x", "coverage": "X 原帖（RSSHub，非官方）", "handle": "random_walker"},
+    {"name": "X: @percyliang", "type": "x", "kind": "x", "coverage": "X 原帖（RSSHub，非官方）", "handle": "percyliang"},
+    {"name": "X: @leanprover", "type": "x", "kind": "x", "coverage": "X 原帖（RSSHub，非官方）", "handle": "leanprover"},
+    {"name": "X: @chrmanning", "type": "x", "kind": "x", "coverage": "X 原帖（RSSHub，非官方）", "handle": "chrmanning"},
+    {"name": "X: @tri_dao", "type": "x", "kind": "x", "coverage": "X 原帖（RSSHub，非官方）", "handle": "tri_dao"},
+    {"name": "X: @JeffDean", "type": "x", "kind": "x", "coverage": "X 原帖（RSSHub，非官方）", "handle": "JeffDean"},
+    {"name": "X: @huggingface", "type": "x", "kind": "x", "coverage": "X 原帖（RSSHub，非官方）", "handle": "huggingface"},
+    {"name": "X: @AnthropicAI", "type": "x", "kind": "x", "coverage": "X 原帖（RSSHub，非官方）", "handle": "AnthropicAI"},
+    {"name": "X: @GoogleDeepMind", "type": "x", "kind": "x", "coverage": "X 原帖（RSSHub，非官方）", "handle": "GoogleDeepMind"},
+    {"name": "X: @OpenAI", "type": "x", "kind": "x", "coverage": "X 原帖（RSSHub，非官方）", "handle": "OpenAI"},
+    {"name": "X: @rasbt", "type": "x", "kind": "x", "coverage": "X 原帖（RSSHub，非官方）", "handle": "rasbt"},
+    {"name": "X: @GoogleResearch", "type": "x", "kind": "x", "coverage": "X 原帖（RSSHub，非官方）", "handle": "GoogleResearch"},
+    {"name": "X: @AIatMeta", "type": "x", "kind": "x", "coverage": "X 原帖（RSSHub，非官方）", "handle": "AIatMeta"},
+    {"name": "X: @Alibaba_Qwen", "type": "x", "kind": "x", "coverage": "X 原帖（RSSHub，非官方）", "handle": "Alibaba_Qwen"},
+    {"name": "X: @JitendraMalikCV", "type": "x", "kind": "x", "coverage": "X 原帖（RSSHub，非官方）", "handle": "JitendraMalikCV"},
+    {"name": "X: @giffmana", "type": "x", "kind": "x", "coverage": "X 原帖（RSSHub，非官方）", "handle": "giffmana"},
+    {"name": "X: @DrJimFan", "type": "x", "kind": "x", "coverage": "X 原帖（RSSHub，非官方）", "handle": "DrJimFan"},
+    {"name": "X: @phillip_isola", "type": "x", "kind": "x", "coverage": "X 原帖（RSSHub，非官方）", "handle": "phillip_isola"},
+    {"name": "X: @lumalabsai", "type": "x", "kind": "x", "coverage": "X 原帖（RSSHub，非官方）", "handle": "lumalabsai"},
+    {"name": "X: @gneubig", "type": "x", "kind": "x", "coverage": "X 原帖（RSSHub，非官方）", "handle": "gneubig"},
+    {"name": "X: @OpenHandsDev", "type": "x", "kind": "x", "coverage": "X 原帖（RSSHub，非官方）", "handle": "OpenHandsDev"},
+    {"name": "X: @EpochAIResearch", "type": "x", "kind": "x", "coverage": "X 原帖（RSSHub，非官方）", "handle": "EpochAIResearch"},
+    {"name": "X: @ArtificialAnlys", "type": "x", "kind": "x", "coverage": "X 原帖（RSSHub，非官方）", "handle": "ArtificialAnlys"},
+    {"name": "X: @lmsysorg", "type": "x", "kind": "x", "coverage": "X 原帖（RSSHub，非官方）", "handle": "lmsysorg"},
+    {"name": "X: @nasqret", "type": "x", "kind": "x", "coverage": "X 原帖（RSSHub，非官方）", "handle": "nasqret"},
+    {"name": "X: @vllm_project", "type": "x", "kind": "x", "coverage": "X 原帖（RSSHub，非官方）", "handle": "vllm_project"},
+    {"name": "X: @leggedrobotics", "type": "x", "kind": "x", "coverage": "X 原帖（RSSHub，非官方）", "handle": "leggedrobotics"},
+    {"name": "X: @IsomorphicLabs", "type": "x", "kind": "x", "coverage": "X 原帖（RSSHub，非官方）", "handle": "IsomorphicLabs"},
+    {"name": "X: @yukez", "type": "x", "kind": "x", "coverage": "X 原帖（RSSHub，非官方）", "handle": "yukez"},
+    {"name": "X: @NousResearch", "type": "x", "kind": "x", "coverage": "X 原帖（RSSHub，非官方）", "handle": "NousResearch"},
+    {"name": "X: @allen_ai", "type": "x", "kind": "x", "coverage": "X 原帖（RSSHub，非官方）", "handle": "allen_ai"},
+    {"name": "Simon Willison 博客", "type": "feed", "kind": "blog", "coverage": "论文或博客补充", "url": "https://simonwillison.net/atom/everything/"},
+    {"name": "Interconnects（Nathan Lambert）", "type": "feed", "kind": "blog", "coverage": "论文或博客补充", "url": "https://www.interconnects.ai/feed"},
+    {"name": "Lilian Weng 博客", "type": "feed", "kind": "blog", "coverage": "论文或博客补充", "url": "https://lilianweng.github.io/index.xml"},
+    {"name": "Normal Tech（Narayanan、Kapoor）", "type": "feed", "kind": "blog", "coverage": "论文或博客补充", "url": "https://www.normaltech.ai/feed"},
+    {"name": "Karpathy 博客", "type": "feed", "kind": "blog", "coverage": "论文或博客补充", "url": "https://karpathy.bearblog.dev/feed/"},
+    {"name": "Terence Tao 博客", "type": "feed", "kind": "blog", "coverage": "论文或博客补充", "url": "https://terrytao.wordpress.com/feed/"},
+    {"name": "Xena Project（Lean 形式化）", "type": "feed", "kind": "blog", "coverage": "论文或博客补充", "url": "https://xenaproject.wordpress.com/feed/"},
+    {"name": "METR", "type": "feed", "kind": "blog", "coverage": "论文或博客补充", "url": "https://metr.org/feed.xml"},
+    {"name": "BAIR 博客", "type": "feed", "kind": "blog", "coverage": "论文或博客补充", "url": "https://bair.berkeley.edu/blog/feed.xml"},
+    {"name": "Hugging Face Daily Papers", "type": "hf_daily", "kind": "paper", "coverage": "第三方精选聚合", "url": "https://huggingface.co/api/daily_papers"},
+    {
+      "name": "arXiv: AI for Math / Formal",
+      "type": "arxiv", "kind": "paper", "coverage": "论文或博客补充",
+      "url": "https://export.arxiv.org/api/query",
+      "query": "(cat:cs.AI OR cat:cs.LO OR cat:cs.CL OR cat:cs.LG OR cat:cs.SE) AND (abs:\"theorem proving\" OR abs:\"formal verification\" OR abs:\"autoformalization\" OR abs:\"proof assistant\" OR abs:\"Lean 4\" OR abs:\"mathlib\")"
+    },
+    {
+      "name": "arXiv: Agent / Reasoning / Evaluation",
+      "type": "arxiv", "kind": "paper", "coverage": "论文或博客补充",
+      "url": "https://export.arxiv.org/api/query",
+      "query": "(cat:cs.AI OR cat:cs.CL OR cat:cs.LG) AND (ti:\"agent evaluation\" OR ti:\"agent benchmark\" OR abs:\"long-horizon\" OR ti:\"AI scientist\" OR ti:\"scientific discovery\" OR ti:\"LLM reasoning\" OR ti:\"reasoning benchmark\")"
+    },
+    {
+      "name": "arXiv: Multimodal Reasoning / Benchmark",
+      "type": "arxiv", "kind": "paper", "coverage": "论文或博客补充",
+      "url": "https://export.arxiv.org/api/query",
+      "query": "(cat:cs.CV OR cat:cs.CL) AND ((ti:\"vision-language\" OR ti:multimodal OR ti:VLM OR ti:MLLM) AND (ti:reasoning OR ti:benchmark OR ti:\"reinforcement learning\") OR (abs:\"vision-language\" AND (abs:chart OR abs:diagram OR abs:spatial) AND abs:benchmark))"
+    },
+    {
+      "name": "arXiv: Video / World Models",
+      "type": "arxiv", "kind": "paper", "coverage": "论文或博客补充",
+      "url": "https://export.arxiv.org/api/query",
+      "query": "cat:cs.CV AND (ti:\"video generation\" OR ti:\"world model\" OR ti:\"video understanding\")"
+    },
+    {
+      "name": "arXiv: Embodied / VLA",
+      "type": "arxiv", "kind": "paper", "coverage": "论文或博客补充",
+      "url": "https://export.arxiv.org/api/query",
+      "query": "cat:cs.RO AND abs:\"vision-language-action\" AND (abs:manipulation OR abs:navigation) AND (abs:generalization OR abs:reasoning)"
+    }
+  ]
+}

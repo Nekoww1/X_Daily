@@ -1,0 +1,18 @@
+.env
+.venv/
+__pycache__/
+data/
+state/
+pull.log
+reports/
+logs/
+.claude/
+# Personal reader profiles stay local; only the example is published.
+profiles/*.toml
+!profiles/example.toml
+# Prototypes and drafts that contain personal report content.
+design/report*.html
+design/shots/
+wecom/build_mpnews*.js
+wecom/mpnews*.json
+CS_AI_Research_Radar_GitHub_Survey_ClaudeCode_Brief_*.md

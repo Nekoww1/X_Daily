@@ -1,0 +1,13 @@
+[Unit]
+Description=X Daily: local RSSHub (127.0.0.1:1200)
+After=mihomo.service
+
+[Service]
+WorkingDirectory=%h/projects/X_Daily
+Environment=PATH=%h/opt/x-daily/node/bin:/usr/bin:/bin
+ExecStart=%h/projects/X_Daily/.venv/bin/python start_rsshub.py
+Restart=on-failure
+RestartSec=5min
+
+[Install]
+WantedBy=default.target

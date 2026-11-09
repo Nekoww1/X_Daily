@@ -1,0 +1,11 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 640 640" width="640" height="640">
+  <defs><linearGradient id="bg" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="#14857a"/><stop offset="1" stop-color="#0b5a53"/></linearGradient></defs>
+  <rect width="640" height="640" fill="url(#bg)"/>
+  <g fill="none" stroke="#ffd27a" stroke-linecap="round">
+    <path d="M473.3 145 A50 50 0 0 1 455 213.3" stroke-width="16"/>
+    <path d="M512.3 122.5 A95 95 0 0 1 477.5 252.3" stroke-width="16" stroke-opacity=".6"/>
+  </g>
+  <circle cx="430" cy="170" r="17" fill="#ffd27a"/>
+  <text x="300" y="400" text-anchor="middle" font-family="Microsoft YaHei, PingFang SC, Noto Sans SC, sans-serif" font-weight="700" font-size="250" fill="#ffffff">研</text>
+  <text x="300" y="500" text-anchor="middle" font-family="Segoe UI, Arial, sans-serif" font-weight="700" font-size="64" letter-spacing="14" fill="#cdeee6">AI DAILY</text>
+</svg>
