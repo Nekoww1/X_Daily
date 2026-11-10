@@ -12,9 +12,12 @@
 - 每条包含中文标题和一段连贯正文，依次说明发生了什么、关键细节，以及它的意义。
 - 头条单独标记，正文的核心发现或数字用浅绿色背景突出。
 - 陌生术语带虚线下划线，释义放在条目下方的灰色注释区。
+- X 贴文附有结果图（基准表、曲线、示意图）时，在正文后配一张图和一行图注，仍在同一张卡片里。
 - 注释区还可包含英文原话、补充信息、证据类型和原文链接。
 - 配置个人研究卡后，可显示“和你的研究”。没有该卡时不显示。
+- 卡片之后是“快讯”：有意思但不够写一整段的内容，每条一句话加原文链接。
 - 文末列出“今天没选的”和简要覆盖说明。
+- 标题日期是送达当天，也就是统计窗口的结束日；副标题写明收录时段。
 
 论文统一放在论文组中。同一个人物的 X 与博客如果配置为不同来源，仍会分组展示。头像由文字和色块生成，不下载真实头像。
 
@@ -40,7 +43,7 @@ flowchart TD
     PROFILE[profiles/*.toml] --> DIGEST[digest.py]
     PROMPTS[prompts/ 与 glossary.json] --> DIGEST
     DATA --> DIGEST
-    DIGEST --> CODEX[Codex CLI：select → write → highlight → lead]
+    DIGEST --> CODEX[Codex CLI：select → write → highlight → lead → brief → images]
     CODEX --> CACHE[data/digest-work/DATE/]
     CODEX --> RENDER[render_mpnews.py]
     RENDER --> ARCHIVE[日报 JSON 与本地 HTML]

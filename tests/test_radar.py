@@ -388,6 +388,17 @@ class WindowTests(unittest.TestCase):
         self.assertEqual(got["status"], "ok_new")
 
 
+
+class ImageTests(unittest.TestCase):
+    def test_post_photos_are_kept_without_avatars_or_duplicates(self):
+        raw = ('<p>Results</p><img src="https://pbs.twimg.com/media/HWs55?format=png&amp;name=orig">'
+               '<img src="https://pbs.twimg.com/profile_images/1/a.jpg"><img src="https://pbs.twimg.com/media/HWs55?format=png">')
+        self.assertEqual(radar.images_in(raw), ["https://pbs.twimg.com/media/HWs55?format=png"])
+        source = {"name": "X: @a", "kind": "x", "coverage": "x"}
+        item = radar.make_item(source, "t", "https://x.com/a/status/1", NOW, raw, NOW)
+        self.assertEqual(item["images"], ["https://pbs.twimg.com/media/HWs55?format=png"])
+        self.assertNotIn("images", radar.make_item(dict(source, kind="blog"), "t", "u", NOW, raw, NOW))
+
 class StatusTests(unittest.TestCase):
     def test_old_entries_mean_no_update_and_are_not_reported_as_today(self):
         got = collect(rss(("old", "Mon, 01 Jun 2026 10:00:00 +0000")))

@@ -181,12 +181,26 @@ class XPacer:
                 "duration_seconds": round(self.clock() - self.started, 3) if self.requests else 0.0}
 
 
+X_IMAGE_RE = re.compile(r"https://pbs\.twimg\.com/media/[\w-]+(?:\?format=\w+|\.(?:jpg|png))?")
+MAX_IMAGES = 4
+
+
+def images_in(raw):
+    """Photos attached to an X post, as their pbs.twimg.com links (video thumbnails and avatars excluded)."""
+    found = []
+    for url in X_IMAGE_RE.findall(html.unescape(raw or "")):
+        if url not in found:
+            found.append(url)
+    return found[:MAX_IMAGES]
+
+
 def clean_text(raw):
     text = re.sub(r"<[^>]+>", " ", raw or "")
     return re.sub(r"\s+", " ", html.unescape(text)).strip()
 
 
 def make_item(source, title, url, when, summary, fetched_at, **extra):
+    images = images_in(summary) if source["kind"] == "x" else []
     summary = clean_text(summary)
     title = clean_text(title) or summary[:80]
     item = {
@@ -199,6 +213,8 @@ def make_item(source, title, url, when, summary, fetched_at, **extra):
         "fetched_at": fetched_at.isoformat(),
         "summary": summary[:source.get("summary_limit", 1200)],
     }
+    if images:
+        item["images"] = images
     item.update(extra)
     return item
 
@@ -391,10 +407,11 @@ def fetch_thread_chain(base, handle, post_id, timeline_ids, pacer):
         if not match or not when or match.group(1).lower() != handle.lower():
             continue
         part_id = int(match.group(2))
-        text = clean_text(entry.get("summary") or entry.get("title"))
+        raw = entry.get("summary") or entry.get("title")
+        text = clean_text(raw)
         if text.startswith("Re @") and part_id not in timeline_ids:
             continue
-        chain[part_id] = {"id": part_id, "url": entry["link"], "when": when, "text": strip_reply_prefix(text)}
+        chain[part_id] = {"id": part_id, "url": entry["link"], "when": when, "text": strip_reply_prefix(text), "images": images_in(raw)}
     return [chain[key] for key in sorted(chain)]
 
 
@@ -410,6 +427,9 @@ def apply_thread(item, chain, post_id, start, end):
     else:  # A new post added to an older thread: keep its own link so it is not lost as "already seen".
         started = root["when"].astimezone(TAIPEI).strftime("%m-%d")
         item["summary"] = f"（接续 {started} 开始的 thread）{merged}"[:THREAD_SUMMARY_LIMIT]
+    images = list(dict.fromkeys(url for part in chain for url in part.get("images", []) + item.get("images", [])))
+    if images:
+        item["images"] = images[:MAX_IMAGES]
     if len(chain) > 1:
         item["thread_parts"] = len(chain)
 

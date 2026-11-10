@@ -1,7 +1,8 @@
 """Render a finished digest into a WeCom mpnews article (the benchmark look of wecom/build_mpnews_prose.js).
 
-Digest shape: {"date_label", "lead", "items": [...], "gloss": {term: text}, "cut": [str], "coverage"}.
-Each item: who, group, handle, kind_label, ev, url, top, title, text, you, extra, quote.
+Digest shape: {"date_label", "window", "lead", "items": [...], "briefs": [...], "gloss": {term: text}, "cut": [str], "coverage"}.
+Each item: who, group, handle, kind_label, ev, url, top, title, text, you, extra, quote, and optionally
+image {file, caption}. Each brief: who, url, text.
 In title/text/you: [[term]] marks a glossary term, ==phrase== marks the paragraph's focus.
 """
 import html
@@ -12,6 +13,9 @@ AVATARS = ["#3b6fd8", "#d9622b", "#2f8a6e", "#8a5cd6", "#c2416b", "#4f7b9a", "#b
 EV_LABEL = {"first": "一手发布", "third": "第三方评测", "comment": "观点评论", "claim": "未独立核验"}
 TEXT = f"color:{INK};font-size:15px;line-height:1.8;letter-spacing:.5px;text-align:justify"
 NOTE_STYLE = f"color:{NOTE};font-size:13px;line-height:1.7;letter-spacing:.3px;text-align:justify"
+
+# Images go to WeCom as this placeholder plus the file name; the VPS swaps in the uploaded image's URL.
+IMAGE_PLACEHOLDER = "xdaily-image:"
 
 TERM_RE = re.compile(r"\[\[(.+?)\]\]")
 FOCUS_RE = re.compile(r"==(.+?)==")
@@ -46,7 +50,17 @@ def avatar(who, color, size):
             f'margin-right:{gap}px;vertical-align:middle">{esc(who[:1])}</span>')
 
 
-def post(item, k, total, color, gloss):
+def figure(item, image_src):
+    """The post's result chart, inside the same card: picture, then a gray caption."""
+    image = item.get("image")
+    if not image or not image_src:
+        return ""
+    return (f'<!--image:{esc(image["file"])}--><section style="margin:14px 0 0">'
+            f'<img src="{html.escape(image_src(image["file"]))}" style="display:block;width:100%;height:auto;border-radius:4px">'
+            f'<p style="margin:6px 0 0;{NOTE_STYLE};font-size:12px">图｜{esc(image["caption"])}</p></section><!--/image-->')
+
+
+def post(item, k, total, color, gloss, image_src=None):
     notes = [f"{marked(f'[[{t}]]')}：{esc(gloss[t])}" for t in terms_in(item["title"], item["text"], item.get("you", "")) if t in gloss]
     if item.get("extra"):
         notes.append(esc(item["extra"]))
@@ -61,6 +75,7 @@ def post(item, k, total, color, gloss):
         + f'<p style="margin:0;font-size:18px;font-weight:bold;line-height:1.5;color:{TITLE}">{marked(item["title"])}</p>'
         + f'<section style="width:32px;height:3px;background:{TITLE};margin:8px 0 12px"></section>'
         + f'<p style="margin:0;{TEXT}">{marked(item["text"])}</p>'
+        + figure(item, image_src)
         + (f'<p style="margin:12px 0 0;{TEXT};font-size:14px"><span style="color:{NOTE}">和你的研究｜</span>{marked(item["you"])}</p>' if item.get("you") else "")
         + f'<section style="margin-top:12px;{NOTE_STYLE}">'
         + "".join(f'<p style="margin:0 0 2px">{n}</p>' for n in notes)
@@ -76,7 +91,16 @@ def groups(items):
     return list(order.values())
 
 
-def render_content(digest):
+def briefs(digest):
+    rows = "".join(
+        f'<p style="margin:0 0 10px;{TEXT};font-size:14px"><b style="color:{INK}">{esc(b["who"])}</b>：{esc(b["text"])} '
+        f'<a href="{html.escape(b["url"])}" style="color:{NOTE};font-size:12px;text-decoration:underline">原文</a></p>'
+        for b in digest.get("briefs", []))
+    return (f'<section style="padding-top:20px;margin-bottom:20px;border-top:1px solid {RULE}">'
+            f'<p style="margin:0 0 10px;font-size:12px;letter-spacing:2px;color:{TITLE}">快讯</p>{rows}</section>') if rows else ""
+
+
+def render_content(digest, image_src=None):
     body = []
     for n, posts in enumerate(groups(digest["items"])):
         first, color = posts[0], AVATARS[n % len(AVATARS)]
@@ -86,16 +110,18 @@ def render_content(digest):
             f'<p style="margin:0 0 14px;font-size:16px;font-weight:bold;color:{INK}">{avatar(first["who"], color, 28)}{esc(first["who"])}'
             f'<span style="color:{NOTE};font-weight:normal;font-size:13px;margin-left:6px">{esc(first.get("handle", ""))}</span>{count}</p>'
             f'<section style="border-left:2px solid {color};padding-left:12px;margin-left:13px">'
-            + "".join(post(p, k, len(posts), color, digest["gloss"]) for k, p in enumerate(posts))
+            + "".join(post(p, k, len(posts), color, digest["gloss"], image_src) for k, p in enumerate(posts))
             + "</section></section>")
     cut = "".join(f'<p style="margin:0 0 2px">{esc(c)}</p>' for c in digest.get("cut", []))
     return (
         f'<section style="{TEXT}">'
         f'<p style="margin:0;text-align:center;font-size:12px;letter-spacing:3px;color:{TITLE}">CS / AI 科研雷达</p>'
-        f'<p style="margin:2px 0 22px;text-align:center;font-size:13px;color:{NOTE}">{esc(digest["date_label"])} · 入选 {len(digest["items"])} 条</p>'
+        f'<p style="margin:2px 0 0;text-align:center;font-size:13px;color:{NOTE}">{esc(digest["date_label"])} · 入选 {len(digest["items"])} 条</p>'
+        f'<p style="margin:0 0 22px;text-align:center;font-size:12px;color:{NOTE}">{esc(digest.get("window", ""))}</p>'
         + (f'<p style="margin:0 0 4px;font-size:12px;letter-spacing:2px;color:{TITLE}">今日导读</p>'
            f'<p style="margin:0 0 26px;{TEXT};font-size:16px">{marked(digest["lead"])}</p>' if digest.get("lead") else "")
         + "".join(body)
+        + briefs(digest)
         + f'<section style="padding-top:20px;border-top:1px solid {RULE};{NOTE_STYLE}">'
         + (f'<p style="margin:0 0 4px;color:{INK};font-weight:bold">今天没选的</p>{cut}' if cut else "")
         + f'<p style="margin:12px 0 0;font-size:12px">{esc(digest.get("coverage", ""))}</p></section></section>')
@@ -106,13 +132,13 @@ def utf8_cut(s, limit):
     return data.decode("utf-8", "ignore")
 
 
-def render_article(digest):
+def render_article(digest, image_src=None):
     tops = [i for i in digest["items"] if i.get("top")] or digest["items"][:3]
     return {
         "title": utf8_cut(f"AI科研日报 · {digest['date_label']}", 128),
         "author": "CS/AI 科研雷达",
         "digest": utf8_cut("\n".join("· " + plain(i["title"]) for i in tops), 512),
-        "content": render_content(digest),
+        "content": render_content(digest, image_src),
     }
 
 

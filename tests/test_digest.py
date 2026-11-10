@@ -2,6 +2,7 @@ import json
 import sys
 import tempfile
 import unittest
+from unittest import mock
 from datetime import date
 from pathlib import Path
 
@@ -21,11 +22,16 @@ def candidate(cid, source, kind, url, summary, title="t"):
             "thread_parts": 2, "upvotes": 0, "published_at": "2026-11-06T17:20:31+00:00"}
 
 
+BRIEF_SOURCE = "In AA-PersonalityBench, models that rank high on sincerity tend to rank low on slop across 30 traits."
+
+
 def day_data():
     return {"sources": [{"source": "X: @GoogleDeepMind", "status": "ok_new", "reason": ""},
                         {"source": "METR", "status": "failed", "reason": "timeout"}],
-            "candidates": [candidate("c1", "X: @GoogleDeepMind", "x", "https://x.com/GoogleDeepMind/status/1", SOURCE),
-                           candidate("c2", "X: @someone", "x", "https://x.com/someone/status/2", "lol friday deploys")]}
+            "candidates": [candidate("c1", "X: @GoogleDeepMind", "x", "https://x.com/GoogleDeepMind/status/1", SOURCE)
+                           | {"images": ["https://pbs.twimg.com/media/AAA?format=png"]},
+                           candidate("c2", "X: @someone", "x", "https://x.com/someone/status/2", "lol friday deploys"),
+                           candidate("c3", "X: @ArtificialAnlys", "x", "https://x.com/ArtificialAnlys/status/3", BRIEF_SOURCE)]}
 
 
 def written(**overrides):
@@ -39,10 +45,11 @@ class FakeCodex:
     def __init__(self, answers):
         self.answers, self.calls = answers, []
 
-    def __call__(self, prompt, schema, log_path, model):
+    def __call__(self, prompt, schema, log_path, model, images=()):
         label = log_path.name.split(".")[0]
         self.calls.append(label)
         self.models = getattr(self, "models", {}) | {label: model}
+        self.images = getattr(self, "images", {}) | {label: list(images)}
         answer = self.answers[label]
         return answer.pop(0) if isinstance(answer, list) else answer
 
@@ -101,21 +108,33 @@ class BuildTests(unittest.TestCase):
         (tmp / "data" / "2026-11-07.json").write_text(json.dumps(day_data()), encoding="utf-8")
         (tmp / "glossary.json").write_text(json.dumps(GLOSS, ensure_ascii=False), encoding="utf-8")
         fake = FakeCodex(answers)
+        self.downloads = []
+
+        def download(url, path):
+            self.downloads.append(url)
+            path.write_bytes(b"\x89PNG\r\n\x1a\n fake")
+            return True
+        patcher = mock.patch.object(digest, "download_image", download)
+        patcher.start()
+        self.addCleanup(patcher.stop)
         result = digest.build(date(2026, 11, 7), digest.Steps(tmp / "work", runner=fake), root=tmp, profile=profile or digest.load_profile("example"))
         return result, fake, tmp
 
     def answers(self, **overrides):
         marked = TEXT.replace("在人类引导下发现了旧版 [[1024 位]] [[RSA]] 的两处重大弱点", "==在人类引导下发现了旧版 [[1024 位]] [[RSA]] 的两处重大弱点==")
         base = {"select": {"items": [{"ids": ["c1", "nope"], "who": "Google DeepMind", "top": True, "ev": "claim"}],
-                           "cut": ["@someone：周五部署玩笑——无信息量"]},
+                           "briefs": [{"ids": ["c3"], "who": "Artificial Analysis"}],
+                           "cut": ["@someone：周五部署玩笑（c2）——无信息量"]},
                 "write": {"items": [written()]},
                 "highlight": {"items": [{"id": "c1", "text": marked}]},
-                "lead": {"lead": "今天最值得注意的是 DeepMind 说模型找到了旧版 RSA 的弱点。"}}
+                "lead": {"lead": "今天最值得注意的是 DeepMind 说模型找到了旧版 RSA 的弱点。"},
+                "brief": {"items": [{"id": "c3", "text": "性格基准覆盖 30 种特质，真诚度排名高的模型套话也更少。"}]},
+                "images": {"items": [{"id": "c1", "image": "c1-1.png", "caption": "DeepMind 推文附图"}]}}
         return base | overrides
 
     def test_full_run_renders_without_markers(self):
         result, fake, _ = self.build(self.answers())
-        self.assertEqual(fake.calls, ["select", "write", "highlight", "lead"])
+        self.assertEqual(fake.calls, ["select", "write", "highlight", "lead", "brief", "images"])
         self.assertEqual(fake.models["write"], digest.WRITER)
         self.assertEqual(fake.models["highlight"], digest.WRITER)
         self.assertEqual(fake.models["select"], (digest.MODEL, digest.EFFORT))
@@ -128,6 +147,17 @@ class BuildTests(unittest.TestCase):
         self.assertNotIn("==", content)
         self.assertNotIn("[[", content)
         self.assertIn("RSA</span>：常用公钥加密算法。", content)
+        self.assertEqual(result["date_label"], "2026-11-08（周日）")  # the morning the 11-07 window ends
+        self.assertIn("收录 11-07 08:00 至 11-08 08:00", content)
+        self.assertEqual(result["cut"], ["@someone：周五部署玩笑——无信息量"])
+        self.assertEqual(result["briefs"][0]["who"], "Artificial Analysis")
+        self.assertIn("快讯", content)
+        self.assertEqual(item["image"], {"file": "c1-1.png", "caption": "DeepMind 推文附图"})
+        self.assertTrue(fake.images["images"][0].endswith("c1-1.png"))
+        self.assertNotIn("<img", content)  # no image source given: the picture is left out
+        with_images = render.render_article(result, image_src=lambda n: render.IMAGE_PLACEHOLDER + n)["content"]
+        self.assertIn('src="xdaily-image:c1-1.png"', with_images)
+        self.assertIn("图｜DeepMind 推文附图", with_images)
 
     def test_failing_item_is_retried_with_the_problem(self):
         bad = written(text=TEXT.replace("2048", "4096"))
@@ -170,6 +200,18 @@ class BuildTests(unittest.TestCase):
         self.assertEqual(result["items"][0]["you"], "")
         self.assertNotIn("示例项目 Alpha", (tmp / "work" / "write.prompt.md").read_text(encoding="utf-8"))
         self.assertIn("固定留空", (tmp / "work" / "write.prompt.md").read_text(encoding="utf-8"))
+
+    def test_brief_with_a_number_not_in_the_source_is_dropped(self):
+        bad = {"items": [{"id": "c3", "text": "性格基准覆盖 45 种特质，真诚度排名高的模型套话也更少。"}]}
+        result, _, _ = self.build(self.answers(brief=bad))
+        self.assertEqual(result["briefs"], [])
+        self.assertTrue(any("快讯" in w for w in result["warnings"]))
+
+    def test_image_choice_outside_the_offer_or_with_new_numbers_is_ignored(self):
+        result, _, _ = self.build(self.answers(images={"items": [{"id": "c1", "image": "other.png", "caption": ""}]}))
+        self.assertNotIn("image", result["items"][0])
+        result, _, _ = self.build(self.answers(images={"items": [{"id": "c1", "image": "c1-1.png", "caption": "准确率 97%"}]}))
+        self.assertEqual(result["items"][0]["image"]["caption"], "图片来自原帖")
 
 
 if __name__ == "__main__":

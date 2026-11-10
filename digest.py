@@ -6,6 +6,8 @@ Steps, each one `codex exec` call with a JSON schema (official ChatGPT login; lu
   2 write     title + one paragraph + optional "和你的研究" + notes, glossary terms marked [[...]]
   3 highlight mark 1-2 focus phrases per paragraph with ==...==, nothing else may change
   4 lead      the opening paragraph
+  5 brief     one-sentence briefs for items worth knowing but too small for a paragraph
+  6 images    look at the selected X posts' photos and keep a result chart per item, with a caption
 Code checks every step (numbers and quotes must come from the source, highlights must not change text)
 and retries once with the problems listed; what still fails falls back to a safe version.
 The reader profile (profiles/NAME.toml) sets the topics, the reader and "和你的研究".
@@ -14,6 +16,7 @@ Step outputs are cached in data/digest-work/DATE/, so a rerun only calls Codex f
 Usage: python digest.py [--date YYYY-MM-DD] [--send] [--fresh]
 """
 import argparse
+import base64
 import json
 import os
 import re
@@ -35,7 +38,9 @@ MODEL = os.environ.get("DIGEST_MODEL", "gpt-6-luna")
 EFFORT = os.environ.get("DIGEST_EFFORT", "max")
 # Writing the paragraphs and marking their focus read better with sol; selection and the lead stay on luna.
 WRITER = (os.environ.get("DIGEST_WRITER_MODEL", "gpt-6.1-sol"), os.environ.get("DIGEST_WRITER_EFFORT", "high"))
-STEP_MODELS = {"write": WRITER, "write-retry": WRITER, "highlight": WRITER}
+STEP_MODELS = {"write": WRITER, "write-retry": WRITER, "highlight": WRITER, "brief": WRITER, "images": WRITER}
+MAX_DAY_IMAGES = 5
+IMAGE_LIMIT_BYTES = 2_000_000  # WeCom's uploadimg limit
 CODEX_TIMEOUT = 60 * 60  # sol high took 39 min to write 14 items
 WEEKDAYS = "一二三四五六日"
 EV = ["first", "third", "comment", "claim"]
@@ -49,14 +54,17 @@ def obj(required, **props):
 STR, BOOL = {"type": "string"}, {"type": "boolean"}
 arr = lambda item: {"type": "array", "items": item}
 SCHEMAS = {
-    "select": obj(["items", "cut"],
+    "select": obj(["items", "briefs", "cut"],
                   items=arr(obj(["ids", "who", "top", "ev"], ids=arr(STR), who=STR, top=BOOL, ev={"type": "string", "enum": EV})),
+                  briefs=arr(obj(["ids", "who"], ids=arr(STR), who=STR)),
                   cut=arr(STR)),
     "write": obj(["items"], items=arr(obj(["id", "title", "text", "you", "extra", "quote", "new_terms"],
                                           id=STR, title=STR, text=STR, you=STR, extra=STR, quote=STR,
                                           new_terms=arr(obj(["term", "definition"], term=STR, definition=STR))))),
     "highlight": obj(["items"], items=arr(obj(["id", "text"], id=STR, text=STR))),
     "lead": obj(["lead"], lead=STR),
+    "brief": obj(["items"], items=arr(obj(["id", "text"], id=STR, text=STR))),
+    "images": obj(["items"], items=arr(obj(["id", "image", "caption"], id=STR, image=STR, caption=STR))),
 }
 
 
@@ -66,13 +74,13 @@ def codex_bin():
     return os.environ.get("CODEX_BIN") or shutil.which("codex") or str(Path.home() / ".local/bin/codex")
 
 
-def run_codex(prompt, schema, log_path, model=(MODEL, EFFORT), search=False):
+def run_codex(prompt, schema, log_path, model=(MODEL, EFFORT), images=(), search=False):
     """One non-interactive Codex call that must answer with JSON matching schema."""
     name, effort = model
     with tempfile.TemporaryDirectory(prefix="x-daily-codex-") as tmp:
         schema_path, out_path = Path(tmp) / "schema.json", Path(tmp) / "out.json"
         schema_path.write_text(json.dumps(schema), encoding="utf-8")
-        cmd = [codex_bin(), *(["--search"] if search else []), "exec", "--ephemeral", "--skip-git-repo-check",
+        cmd = [codex_bin(), *(["--search"] if search else []), "exec", *(f"--image={i}" for i in images), "--ephemeral", "--skip-git-repo-check",
                "--ignore-user-config",  # skip the third-party provider in config.toml; use the official login
                "-m", name, "-c", f'model_reasoning_effort="{effort}"', "-s", "read-only", "-C", tmp,
                "--output-schema", str(schema_path), "-o", str(out_path), "-"]
@@ -93,7 +101,7 @@ class Steps:
             for f in self.dir.glob("*.json"):
                 f.unlink()
 
-    def __call__(self, label, prompt, schema):
+    def __call__(self, label, prompt, schema, images=()):
         cached = self.dir / f"{label}.json"
         if cached.exists():
             return json.loads(cached.read_text(encoding="utf-8"))
@@ -102,7 +110,7 @@ class Steps:
         for attempt in (1, 2):
             try:
                 model = STEP_MODELS.get(label, (MODEL, EFFORT))
-                answer = self.runner(prompt, schema, self.dir / f"{label}.{attempt}.log", model)
+                answer = self.runner(prompt, schema, self.dir / f"{label}.{attempt}.log", model, images)
                 cached.write_text(json.dumps(answer, ensure_ascii=False, indent=1), encoding="utf-8")
                 return answer
             except Exception as error:  # timeouts, bad JSON, non-zero exit: one retry
@@ -307,7 +315,37 @@ def select_items(steps, data, profile):
     for item in items:  # paper groups show the arXiv id per post via kind_label
         if item["group"] == "论文":
             item["kind_label"] = f"论文 · {handle_of(candidates[item['id']])}"
-    return items, [c.strip() for c in answer["cut"] if c.strip()][:10]
+    briefs = []
+    for entry in answer["briefs"][:6]:
+        ids = [i for i in entry["ids"] if i in candidates and i not in used]
+        if ids:
+            used.update(ids)
+            cands = [candidates[i] for i in ids]
+            briefs.append({"id": ids[0], "who": entry["who"].strip() or cands[0]["source"],
+                           "url": cands[0]["original_url"], "source_text": source_text(cands)})
+    cut = [CANDIDATE_IDS_RE.sub("", c).strip() for c in answer["cut"]]
+    return items, briefs, [c for c in cut if c][:10]
+
+
+CANDIDATE_IDS_RE = re.compile(r"\s*[（(]\s*c\d+(?:\s*[、,，–—~-]\s*c?\d+)*\s*[）)]")
+
+
+def write_briefs(steps, briefs, warnings):
+    """One checked sentence per brief; a brief that fails the checks is dropped, not retried."""
+    if not briefs:
+        return []
+    rows = [{"id": b["id"], "who": b["who"], "source": b["source_text"]} for b in briefs]
+    answer = steps("brief", prompt("brief", DATA=as_json(rows)), SCHEMAS["brief"])
+    texts = {o["id"]: space_cjk(o["text"].strip()) for o in answer["items"]}
+    kept = []
+    for b in briefs:
+        text = texts.get(b["id"], "")
+        missing = [n for n in numbers(text) if n not in source_numbers(normalize(b["source_text"]))]
+        if not 15 <= len(text) <= 110 or missing or "[[" in text or "==" in text:
+            warnings.append(f"{b['id']}: 快讯没通过检查，已去掉")
+            continue
+        kept.append({"who": b["who"], "url": b["url"], "text": text})
+    return kept
 
 
 def write_items(steps, items, gloss, profile, warnings):
@@ -363,6 +401,62 @@ def lead(steps, posts, warnings):
     return text
 
 
+def download_image(url, path):
+    """Fetch an X photo at a phone-friendly size; fall back to the small size above WeCom's limit."""
+    for size in ("medium", "small"):
+        data = radar.fetch(f"{url}{'&' if '?' in url else '?'}name={size}", timeout=60, retries=1)
+        if len(data) <= IMAGE_LIMIT_BYTES:
+            path.write_bytes(data)
+            return True
+    return False
+
+
+def image_suffix(data):
+    return ".png" if data[:8] == b"\x89PNG\r\n\x1a\n" else ".jpg"
+
+
+def pick_images(steps, posts, candidates, warnings):
+    """Let the model look at each selected post's photos and keep at most one result chart per item."""
+    folder = steps.dir / "images"
+    folder.mkdir(exist_ok=True)
+    offered, rows, files = {}, [], []
+    for item, out in posts:
+        urls = [u for i in item["ids"] for u in candidates[i].get("images", [])][:2]
+        names = []
+        for n, url in enumerate(urls, 1):
+            stem = f"{item['id']}-{n}"
+            existing = next(iter(folder.glob(stem + ".*")), None)
+            try:
+                if not existing:
+                    raw = folder / stem
+                    if not download_image(url, raw):
+                        continue
+                    existing = raw.rename(raw.with_suffix(image_suffix(raw.read_bytes())))
+            except Exception as error:
+                warnings.append(f"{item['id']}: 图片下载失败（{type(error).__name__}）")
+                continue
+            names.append(existing.name)
+            files.append(existing)
+        if names:
+            offered[item["id"]] = names
+            rows.append({"id": item["id"], "who": item["who"], "title": render.plain(out["title"]),
+                         "text": render.plain(out["text"]), "images": names})
+    if not rows:
+        return
+    answer = steps("images", prompt("images", DATA=as_json(rows)), SCHEMAS["images"], images=[str(f) for f in files])
+    by_id = {item["id"]: (item, out) for item, out in posts}
+    chosen = 0
+    for o in answer["items"]:
+        if o["id"] not in by_id or o["image"] not in offered.get(o["id"], []) or chosen >= MAX_DAY_IMAGES:
+            continue
+        item, out = by_id[o["id"]]
+        caption = space_cjk(o["caption"].strip())
+        if not set(numbers(caption)) <= source_numbers(normalize(item["source_text"])) or len(caption) > 60:
+            caption = ""
+        out["image"] = {"file": o["image"], "caption": caption or "图片来自原帖"}
+        chosen += 1
+
+
 def coverage(data, selected):
     sources = data["sources"]
     failed = [s["source"] for s in sources if s["status"] == "failed"]
@@ -382,7 +476,7 @@ def build(day, steps, root=ROOT, profile=None):
     if not data["candidates"]:
         raise RuntimeError("今天没有候选内容")
 
-    items, cut = select_items(steps, data, profile)
+    items, briefs, cut = select_items(steps, data, profile)
     if not items:
         raise RuntimeError("筛选后没有入选条目")
     posts = write_items(steps, items, gloss, profile, warnings)
@@ -391,6 +485,8 @@ def build(day, steps, root=ROOT, profile=None):
         out["you"] = ""
     highlight(steps, posts, warnings)
     opening = lead(steps, posts, warnings)
+    brief_items = write_briefs(steps, briefs, warnings)
+    pick_images(steps, posts, {c["id"]: c for c in data["candidates"]}, warnings)
 
     used_terms, final = {}, []
     for item, out in posts:
@@ -398,11 +494,20 @@ def build(day, steps, root=ROOT, profile=None):
         for t in render.terms_in(out["title"], out["text"], out["you"]):
             used_terms[t] = gloss.get(t) or new[t]
         final.append({k: item[k] for k in ("id", "ids", "who", "group", "handle", "kind_label", "ev", "url", "top")}
-                     | {k: out[k].strip() for k in ("title", "text", "you", "extra", "quote")})
+                     | {k: out[k].strip() for k in ("title", "text", "you", "extra", "quote")}
+                     | ({"image": out["image"]} if out.get("image") else {}))
     gloss_path.write_text(json.dumps(gloss | used_terms, ensure_ascii=False, indent=1) + "\n", encoding="utf-8")
-    return {"date": day.isoformat(), "date_label": f"{day.isoformat()}（周{WEEKDAYS[day.weekday()]}）",
-            "lead": opening, "items": final, "gloss": used_terms, "cut": cut,
+    start, end = radar.report_window(day)
+    return {"date": day.isoformat(), "date_label": date_label(day),
+            "window": f"收录 {start:%m-%d %H:%M} 至 {end:%m-%d %H:%M}（北京时间）",
+            "lead": opening, "items": final, "briefs": brief_items, "gloss": used_terms, "cut": cut,
             "coverage": coverage(data, len(final)), "warnings": warnings, "profile": profile["name"], "model": f"{MODEL} {EFFORT}; write/highlight {WRITER[0]} {WRITER[1]}"}
+
+
+def date_label(day):
+    """Readers see the morning the report arrives, i.e. the end of its 08:00-08:00 window."""
+    shown = radar.report_window(day)[1].date()
+    return f"{shown.isoformat()}（周{WEEKDAYS[shown.weekday()]}）"
 
 
 # ---------- delivery ----------
@@ -434,18 +539,25 @@ def main():
     except Exception as error:
         print(f"digest failed: {error}")
         if args.send:
-            deliver({"text": f"AI科研日报 {day.isoformat()} 没有生成：{error}"})
+            deliver({"text": f"AI科研日报 {date_label(day)} 没有生成：{error}"})
         return 1
 
-    article = render.render_article(digest)
+    work = ROOT / "data" / "digest-work" / day.isoformat() / "images"
+    shown = [i["image"]["file"] for i in digest["items"] if i.get("image")]
+    archive = ROOT / "reports" / "img" / day.isoformat()
+    archive.mkdir(parents=True, exist_ok=True)
+    for name in shown:
+        shutil.copyfile(work / name, archive / name)
     (ROOT / "data" / f"{day.isoformat()}.digest.json").write_text(as_json(digest), encoding="utf-8")
-    (ROOT / "reports").mkdir(exist_ok=True)
-    (ROOT / "reports" / f"{day.isoformat()}.html").write_text(render.render_page(article), encoding="utf-8")
+    page = render.render_article(digest, image_src=lambda name: f"img/{day.isoformat()}/{name}")
+    (ROOT / "reports" / f"{day.isoformat()}.html").write_text(render.render_page(page), encoding="utf-8")
+    article = render.render_article(digest, image_src=lambda name: render.IMAGE_PLACEHOLDER + name)
     print(f"items: {len(digest['items'])}, warnings: {len(digest['warnings'])}")
     for w in digest["warnings"]:
         print("  warning:", w)
     if args.send:
-        deliver({"mpnews": article})
+        images = {name: base64.b64encode((work / name).read_bytes()).decode() for name in shown}
+        deliver({"mpnews": article, "images": images})
         print("sent")
     return 0
 
