@@ -127,14 +127,16 @@ class BuildTests(unittest.TestCase):
                            "cut": ["@someone：周五部署玩笑（c2）——无信息量"]},
                 "write": {"items": [written()]},
                 "highlight": {"items": [{"id": "c1", "text": marked}]},
-                "lead": {"lead": "今天最值得注意的是 DeepMind 说模型找到了旧版 RSA 的弱点。"},
+                "lead": {"thread": "今天最值得注意的是 DeepMind 说模型找到了旧版 RSA 的弱点。",
+                         "hooks": [{"id": "c1", "hook": "模型找出旧版 1024 位 RSA 的两处弱点"}, {"id": "zz", "hook": "不存在"}],
+                         "papers": "", "briefs": "性格基准"},
                 "brief": {"items": [{"id": "c3", "text": "性格基准覆盖 30 种特质，真诚度排名高的模型套话也更少。"}]},
                 "images": {"items": [{"id": "c1", "image": "c1-1.png", "caption": "DeepMind 推文附图"}]}}
         return base | overrides
 
     def test_full_run_renders_without_markers(self):
         result, fake, _ = self.build(self.answers())
-        self.assertEqual(fake.calls, ["select", "write", "highlight", "lead", "brief", "images"])
+        self.assertEqual(fake.calls, ["select", "write", "highlight", "brief", "lead", "images"])
         self.assertEqual(fake.models["write"], digest.WRITER)
         self.assertEqual(fake.models["highlight"], digest.WRITER)
         self.assertEqual(fake.models["select"], (digest.MODEL, digest.EFFORT))
@@ -152,6 +154,11 @@ class BuildTests(unittest.TestCase):
         self.assertEqual(result["cut"], ["@someone：周五部署玩笑——无信息量"])
         self.assertEqual(result["briefs"][0]["who"], "Artificial Analysis")
         self.assertIn("快讯", content)
+        self.assertEqual(result["toc"]["hooks"], {"c1": "模型找出旧版 1024 位 RSA 的两处弱点"})
+        self.assertIn("今日导读", content)
+        self.assertIn("模型找出旧版 1024 位 RSA 的两处弱点", content)
+        self.assertIn("快讯 · 1 条", content)
+        self.assertLess(content.index("今日导读"), content.index(">头条<"))
         self.assertEqual(item["image"], {"file": "c1-1.png", "caption": "DeepMind 推文附图"})
         self.assertTrue(fake.images["images"][0].endswith("c1-1.png"))
         self.assertNotIn("<img", content)  # no image source given: the picture is left out
@@ -212,6 +219,14 @@ class BuildTests(unittest.TestCase):
         self.assertNotIn("image", result["items"][0])
         result, _, _ = self.build(self.answers(images={"items": [{"id": "c1", "image": "c1-1.png", "caption": "准确率 97%"}]}))
         self.assertEqual(result["items"][0]["image"]["caption"], "图片来自原帖")
+
+
+    def test_hook_with_a_new_number_falls_back_to_the_title(self):
+        lead = {"thread": "今天的主线是 RSA。", "hooks": [{"id": "c1", "hook": "模型找出 3 处 RSA 弱点"}], "papers": "", "briefs": ""}
+        result, _, _ = self.build(self.answers(lead=lead))
+        self.assertEqual(result["toc"]["hooks"], {})
+        self.assertTrue(any("目录导语" in w for w in result["warnings"]))
+        self.assertIn("DeepMind：AI 找出旧版 RSA 的两处弱点", render.render_article(result)["content"])
 
 
 if __name__ == "__main__":

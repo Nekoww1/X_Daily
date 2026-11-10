@@ -6,7 +6,7 @@
 
 ## 日报长什么样
 
-日报从“今日导读”开始，随后按人物或机构的来源分组呈现卡片：
+日报从“今日导读”开始：一句主线串起今天的头条，下面是一份目录，按“头条 / 更多动态 / 论文 / 快讯”列出每条的来源和一句导语，读者一眼能看清今天有什么、先读哪里。正文按同样的顺序分栏，每栏有小标题，栏内按人物或机构的来源分组呈现卡片：
 
 - 来源栏显示姓名或机构名、首字色块头像，以及账号或来源信息。
 - 每条包含中文标题和一段连贯正文，依次说明发生了什么、关键细节，以及它的意义。
@@ -43,7 +43,7 @@ flowchart TD
     PROFILE[profiles/*.toml] --> DIGEST[digest.py]
     PROMPTS[prompts/ 与 glossary.json] --> DIGEST
     DATA --> DIGEST
-    DIGEST --> CODEX[Codex CLI：select → write → highlight → lead → brief → images]
+    DIGEST --> CODEX[Codex CLI：select → write → highlight → brief → lead → images]
     CODEX --> CACHE[data/digest-work/DATE/]
     CODEX --> RENDER[render_mpnews.py]
     RENDER --> ARCHIVE[日报 JSON 与本地 HTML]

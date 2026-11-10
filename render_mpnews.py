@@ -1,6 +1,8 @@
 """Render a finished digest into a WeCom mpnews article (the benchmark look of wecom/build_mpnews_prose.js).
 
-Digest shape: {"date_label", "window", "lead", "items": [...], "briefs": [...], "gloss": {term: text}, "cut": [str], "coverage"}.
+Digest shape: {"date_label", "window", "lead", "toc": {"hooks": {id: str}, "papers", "briefs"}, "items": [...],
+"briefs": [...], "gloss": {term: text}, "cut": [str], "coverage"}.
+The body runs in fixed sections: 头条 → 更多动态 → 论文 → 快讯; the lead's table of contents follows the same order.
 Each item: who, group, handle, kind_label, ev, url, top, title, text, you, extra, quote, and optionally
 image {file, caption}. Each brief: who, url, text.
 In title/text/you: [[term]] marks a glossary term, ==phrase== marks the paragraph's focus.
@@ -96,30 +98,75 @@ def briefs(digest):
         f'<p style="margin:0 0 10px;{TEXT};font-size:14px"><b style="color:{INK}">{esc(b["who"])}</b>：{esc(b["text"])} '
         f'<a href="{html.escape(b["url"])}" style="color:{NOTE};font-size:12px;text-decoration:underline">原文</a></p>'
         for b in digest.get("briefs", []))
-    return (f'<section style="padding-top:20px;margin-bottom:20px;border-top:1px solid {RULE}">'
-            f'<p style="margin:0 0 10px;font-size:12px;letter-spacing:2px;color:{TITLE}">快讯</p>{rows}</section>') if rows else ""
+    return (f'<p style="{SECTION_LABEL};margin-bottom:10px">快讯</p>'
+            f'<section style="padding-top:16px;margin-bottom:20px;border-top:1px solid {RULE}">{rows}</section>') if rows else ""
+
+
+SECTION_LABEL = f"margin:26px 0 0;font-size:12px;letter-spacing:2px;color:{TITLE}"
+
+
+def sections(items):
+    """[(label, groups)] in reading order: headlines, other news, papers. Empty sections are left out."""
+    gs = groups(items)
+    tops = [g for g in gs if any(i.get("top") for i in g)]
+    papers = [g for g in gs if g not in tops and g[0]["group"] == "论文"]
+    rest = [g for g in gs if g not in tops and g not in papers]
+    return [(label, g) for label, g in (("头条", tops), ("更多动态", rest), ("论文", papers)) if g]
+
+
+def toc(digest, ordered, colors):
+    """The lead's table of contents: one row per post for headlines and news, one line each for papers and briefs."""
+    hooks = digest.get("toc", {}).get("hooks", {})
+    heading = lambda text: f'<p style="margin:14px 0 6px;font-size:12px;color:{NOTE}">{text}</p>'
+    line = lambda body: f'<p style="margin:0 0 8px;{TEXT};font-size:14px;line-height:1.6">{body}</p>'
+    out = []
+    for label, gs in ordered:
+        posts = [p for g in gs for p in g]
+        if label == "论文":
+            summary = digest.get("toc", {}).get("papers") or "、".join(plain(p["title"]) for p in posts[:2])
+            out.append(heading(f"论文 · {len(posts)} 篇") + line(esc(summary)))
+            continue
+        out.append(heading(label))
+        for p in posts:
+            dot = (f'<span style="display:inline-block;width:6px;height:6px;border-radius:2px;background:{colors[p["group"]]};'
+                   f'margin:0 8px 2px 0;vertical-align:middle"></span>')
+            out.append(line(f'{dot}<b style="color:{INK}">{esc(p["who"])}</b><span style="color:{NOTE}">｜</span>'
+                            f'{esc(hooks.get(p["id"]) or plain(p["title"]))}'))
+    if digest.get("briefs"):
+        summary = digest.get("toc", {}).get("briefs") or "、".join(b["who"] for b in digest["briefs"][:3])
+        out.append(heading(f"快讯 · {len(digest['briefs'])} 条") + line(esc(summary)))
+    return "".join(out)
 
 
 def render_content(digest, image_src=None):
-    body = []
-    for n, posts in enumerate(groups(digest["items"])):
-        first, color = posts[0], AVATARS[n % len(AVATARS)]
-        count = f'<span style="color:{NOTE};font-weight:normal;font-size:13px;margin-left:6px">· {len(posts)} 条</span>' if len(posts) > 1 else ""
-        body.append(
-            f'<section style="margin:0 0 6px;padding-top:20px;border-top:1px solid {RULE}">'
-            f'<p style="margin:0 0 14px;font-size:16px;font-weight:bold;color:{INK}">{avatar(first["who"], color, 28)}{esc(first["who"])}'
-            f'<span style="color:{NOTE};font-weight:normal;font-size:13px;margin-left:6px">{esc(first.get("handle", ""))}</span>{count}</p>'
-            f'<section style="border-left:2px solid {color};padding-left:12px;margin-left:13px">'
-            + "".join(post(p, k, len(posts), color, digest["gloss"], image_src) for k, p in enumerate(posts))
-            + "</section></section>")
+    ordered = sections(digest["items"])
+    colors, body = {}, []
+    for label, gs in ordered:
+        body.append(f'<p style="{SECTION_LABEL}">{label}</p>')
+        for posts in gs:
+            first = posts[0]
+            color = colors.setdefault(first["group"], AVATARS[len(colors) % len(AVATARS)])
+            count = f'<span style="color:{NOTE};font-weight:normal;font-size:13px;margin-left:6px">· {len(posts)} 条</span>' if len(posts) > 1 else ""
+            body.append(
+                f'<section style="margin:0 0 6px;padding-top:20px;border-top:1px solid {RULE}">'
+                f'<p style="margin:0 0 14px;font-size:16px;font-weight:bold;color:{INK}">{avatar(first["who"], color, 28)}{esc(first["who"])}'
+                f'<span style="color:{NOTE};font-weight:normal;font-size:13px;margin-left:6px">{esc(first.get("handle", ""))}</span>{count}</p>'
+                f'<section style="border-left:2px solid {color};padding-left:12px;margin-left:13px">'
+                + "".join(post(p, k, len(posts), color, digest["gloss"], image_src) for k, p in enumerate(posts))
+                + "</section></section>")
     cut = "".join(f'<p style="margin:0 0 2px">{esc(c)}</p>' for c in digest.get("cut", []))
+    opening = ""
+    if digest.get("lead") or digest.get("toc"):
+        opening = (f'<p style="margin:0 0 4px;font-size:12px;letter-spacing:2px;color:{TITLE}">今日导读</p>'
+                   + (f'<p style="margin:0 0 6px;{TEXT};font-size:16px">{marked(digest["lead"])}</p>' if digest.get("lead") else "")
+                   + (toc(digest, ordered, colors) if digest.get("toc") else "")
+                   + '<p style="margin:0 0 4px"></p>')
     return (
         f'<section style="{TEXT}">'
         f'<p style="margin:0;text-align:center;font-size:12px;letter-spacing:3px;color:{TITLE}">CS / AI 科研雷达</p>'
         f'<p style="margin:2px 0 0;text-align:center;font-size:13px;color:{NOTE}">{esc(digest["date_label"])} · 入选 {len(digest["items"])} 条</p>'
         f'<p style="margin:0 0 22px;text-align:center;font-size:12px;color:{NOTE}">{esc(digest.get("window", ""))}</p>'
-        + (f'<p style="margin:0 0 4px;font-size:12px;letter-spacing:2px;color:{TITLE}">今日导读</p>'
-           f'<p style="margin:0 0 26px;{TEXT};font-size:16px">{marked(digest["lead"])}</p>' if digest.get("lead") else "")
+        + opening
         + "".join(body)
         + briefs(digest)
         + f'<section style="padding-top:20px;border-top:1px solid {RULE};{NOTE_STYLE}">'

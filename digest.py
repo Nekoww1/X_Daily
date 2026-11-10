@@ -5,8 +5,8 @@ Steps, each one `codex exec` call with a JSON schema (official ChatGPT login; lu
   1 select    pick 8-14 items, 3 headlines, evidence type, what was cut
   2 write     title + one paragraph + optional "和你的研究" + notes, glossary terms marked [[...]]
   3 highlight mark 1-2 focus phrases per paragraph with ==...==, nothing else may change
-  4 lead      the opening paragraph
-  5 brief     one-sentence briefs for items worth knowing but too small for a paragraph
+  4 brief     one-sentence briefs for items worth knowing but too small for a paragraph
+  5 lead      the opening: one main-line sentence plus a table of contents (a hook per item)
   6 images    look at the selected X posts' photos and keep a result chart per item, with a caption
 Code checks every step (numbers and quotes must come from the source, highlights must not change text)
 and retries once with the problems listed; what still fails falls back to a safe version.
@@ -62,7 +62,8 @@ SCHEMAS = {
                                           id=STR, title=STR, text=STR, you=STR, extra=STR, quote=STR,
                                           new_terms=arr(obj(["term", "definition"], term=STR, definition=STR))))),
     "highlight": obj(["items"], items=arr(obj(["id", "text"], id=STR, text=STR))),
-    "lead": obj(["lead"], lead=STR),
+    "lead": obj(["thread", "hooks", "papers", "briefs"], thread=STR,
+                hooks=arr(obj(["id", "hook"], id=STR, hook=STR)), papers=STR, briefs=STR),
     "brief": obj(["items"], items=arr(obj(["id", "text"], id=STR, text=STR))),
     "images": obj(["items"], items=arr(obj(["id", "image", "caption"], id=STR, image=STR, caption=STR))),
 }
@@ -390,15 +391,33 @@ def highlight(steps, posts, warnings):
             warnings.append(f"{item['id']}: 重点标记对不上原文或数量不对，这段不标重点")
 
 
-def lead(steps, posts, warnings):
-    rows = [{"top": item["top"], "who": item["who"], "title": render.plain(out["title"]), "text": render.plain(out["text"])} for item, out in posts]
-    text = space_cjk(steps("lead", prompt("lead", DATA=as_json(rows)), SCHEMAS["lead"])["lead"].strip())
-    allowed = source_numbers(" ".join(r["title"] + " " + r["text"] + " " + item["source_text"] for r, (item, _) in zip(rows, posts)))
-    missing = [n for n in numbers(text) if n not in allowed]
-    if missing:
-        warnings.append(f"导读里的数字不在条目中：{'、'.join(missing)}，已不用导读")
-        return ""
-    return text
+def lead(steps, posts, briefs, warnings):
+    """The opening: a main-line sentence and a hook per item for the table of contents.
+
+    Every number must already appear in the items or their sources. A failing hook falls back to the
+    item's title; a failing main line is dropped, the table of contents stays.
+    """
+    rows = [{"id": item["id"], "top": item["top"], "who": item["who"], "title": render.plain(out["title"]),
+             "text": render.plain(out["text"])} for item, out in posts]
+    brief_lines = "\n".join(f"- {b['who']}：{b['text']}" for b in briefs) or "（今天没有快讯）"
+    answer = steps("lead", prompt("lead", DATA=as_json(rows), BRIEFS=brief_lines), SCHEMAS["lead"])
+    allowed = source_numbers(" ".join(r["title"] + " " + r["text"] + " " + item["source_text"] for r, (item, _) in zip(rows, posts))
+                             + " " + brief_lines)
+
+    def checked(text, limit, what):
+        text = space_cjk(text.strip())
+        missing = [n for n in numbers(text) if n not in allowed]
+        if missing or len(text) > limit or "[[" in text or "==" in text:
+            warnings.append(f"导读的{what}没通过检查" + (f"（数字 {'、'.join(missing)} 不在条目中）" if missing else "") + "，已不用")
+            return ""
+        return text
+
+    hooks = {}
+    for o in answer["hooks"]:
+        if any(item["id"] == o["id"] for item, _ in posts):
+            hooks[o["id"]] = checked(o["hook"], 36, f" {o['id']} 目录导语")
+    return {"thread": checked(answer["thread"], 90, "主线"), "hooks": {k: v for k, v in hooks.items() if v},
+            "papers": checked(answer["papers"], 50, "论文概括"), "briefs": checked(answer["briefs"], 50, "快讯概括")}
 
 
 def download_image(url, path):
@@ -484,8 +503,8 @@ def build(day, steps, root=ROOT, profile=None):
     for _, out in [p for p in posts if p[1]["you"]][limit:]:  # the profile caps "和你的研究"
         out["you"] = ""
     highlight(steps, posts, warnings)
-    opening = lead(steps, posts, warnings)
     brief_items = write_briefs(steps, briefs, warnings)
+    opening = lead(steps, posts, brief_items, warnings)
     pick_images(steps, posts, {c["id"]: c for c in data["candidates"]}, warnings)
 
     used_terms, final = {}, []
@@ -500,7 +519,7 @@ def build(day, steps, root=ROOT, profile=None):
     start, end = radar.report_window(day)
     return {"date": day.isoformat(), "date_label": date_label(day),
             "window": f"收录 {start:%m-%d %H:%M} 至 {end:%m-%d %H:%M}（北京时间）",
-            "lead": opening, "items": final, "briefs": brief_items, "gloss": used_terms, "cut": cut,
+            "lead": opening["thread"], "toc": {k: opening[k] for k in ("hooks", "papers", "briefs")}, "items": final, "briefs": brief_items, "gloss": used_terms, "cut": cut,
             "coverage": coverage(data, len(final)), "warnings": warnings, "profile": profile["name"], "model": f"{MODEL} {EFFORT}; write/highlight {WRITER[0]} {WRITER[1]}"}
 
 
