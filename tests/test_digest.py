@@ -159,6 +159,7 @@ class BuildTests(unittest.TestCase):
         self.assertIn("模型找出旧版 1024 位 RSA 的两处弱点", content)
         self.assertIn("快讯 · 1 条", content)
         self.assertLess(content.index("今日导读"), content.index(">头条<"))
+        self.assertEqual(content.count("vertical-align:2px\">1</span>"), 2)  # same number in the contents and on the card
         self.assertEqual(item["image"], {"file": "c1-1.png", "caption": "DeepMind 推文附图"})
         self.assertTrue(fake.images["images"][0].endswith("c1-1.png"))
         self.assertNotIn("<img", content)  # no image source given: the picture is left out

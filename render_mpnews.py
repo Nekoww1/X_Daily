@@ -62,7 +62,15 @@ def figure(item, image_src):
             f'<p style="margin:6px 0 0;{NOTE_STYLE};font-size:12px">图｜{esc(image["caption"])}</p></section><!--/image-->')
 
 
-def post(item, k, total, color, gloss, image_src=None):
+def badge(n, color, size):
+    """A round number tag; the same number marks a post in the table of contents and in the body."""
+    return (f'<span style="display:inline-block;width:{size}px;height:{size}px;line-height:{size}px;border-radius:50%;'
+            f'background:{color};color:#fff;font-size:{size - 6}px;font-weight:bold;text-align:center;letter-spacing:0;text-indent:0;'
+            f'font-family:Arial,Helvetica,sans-serif;'
+            f'margin:0 8px 0 0;vertical-align:2px">{n}</span>')
+
+
+def post(item, k, total, color, gloss, image_src=None, num=None):
     notes = [f"{marked(f'[[{t}]]')}：{esc(gloss[t])}" for t in terms_in(item["title"], item["text"], item.get("you", "")) if t in gloss]
     if item.get("extra"):
         notes.append(esc(item["extra"]))
@@ -74,7 +82,7 @@ def post(item, k, total, color, gloss, image_src=None):
     return (
         f'<section style="margin:0 0 28px">{byline}'
         + (f'<p style="margin:0 0 2px;font-size:12px;letter-spacing:2px;color:{TITLE}">头条</p>' if item.get("top") else "")
-        + f'<p style="margin:0;font-size:18px;font-weight:bold;line-height:1.5;color:{TITLE}">{marked(item["title"])}</p>'
+        + f'<p style="margin:0;font-size:18px;font-weight:bold;line-height:1.5;color:{TITLE}">{badge(num, color, 20) if num else ""}{marked(item["title"])}</p>'
         + f'<section style="width:32px;height:3px;background:{TITLE};margin:8px 0 12px"></section>'
         + f'<p style="margin:0;{TEXT}">{marked(item["text"])}</p>'
         + figure(item, image_src)
@@ -114,9 +122,16 @@ def sections(items):
     return [(label, g) for label, g in (("头条", tops), ("更多动态", rest), ("论文", papers)) if g]
 
 
+def numbering(ordered):
+    """Post id -> number, for headlines and news in reading order; papers are summarized, not numbered."""
+    posts = [p for label, gs in ordered if label != "论文" for g in gs for p in g]
+    return {p["id"]: n for n, p in enumerate(posts, 1)}
+
+
 def toc(digest, ordered, colors):
     """The lead's table of contents: one row per post for headlines and news, one line each for papers and briefs."""
     hooks = digest.get("toc", {}).get("hooks", {})
+    nums = numbering(ordered)
     heading = lambda text: f'<p style="margin:14px 0 6px;font-size:12px;color:{NOTE}">{text}</p>'
     line = lambda body: f'<p style="margin:0 0 8px;{TEXT};font-size:14px;line-height:1.6">{body}</p>'
     out = []
@@ -128,9 +143,7 @@ def toc(digest, ordered, colors):
             continue
         out.append(heading(label))
         for p in posts:
-            dot = (f'<span style="display:inline-block;width:6px;height:6px;border-radius:2px;background:{colors[p["group"]]};'
-                   f'margin:0 8px 2px 0;vertical-align:middle"></span>')
-            out.append(line(f'{dot}<b style="color:{INK}">{esc(p["who"])}</b><span style="color:{NOTE}">｜</span>'
+            out.append(line(f'{badge(nums[p["id"]], colors[p["group"]], 16)}<b style="color:{INK}">{esc(p["who"])}</b><span style="color:{NOTE}">｜</span>'
                             f'{esc(hooks.get(p["id"]) or plain(p["title"]))}'))
     if digest.get("briefs"):
         summary = digest.get("toc", {}).get("briefs") or "、".join(b["who"] for b in digest["briefs"][:3])
@@ -140,7 +153,7 @@ def toc(digest, ordered, colors):
 
 def render_content(digest, image_src=None):
     ordered = sections(digest["items"])
-    colors, body = {}, []
+    colors, body, nums = {}, [], numbering(ordered)
     for label, gs in ordered:
         body.append(f'<p style="{SECTION_LABEL}">{label}</p>')
         for posts in gs:
@@ -152,7 +165,7 @@ def render_content(digest, image_src=None):
                 f'<p style="margin:0 0 14px;font-size:16px;font-weight:bold;color:{INK}">{avatar(first["who"], color, 28)}{esc(first["who"])}'
                 f'<span style="color:{NOTE};font-weight:normal;font-size:13px;margin-left:6px">{esc(first.get("handle", ""))}</span>{count}</p>'
                 f'<section style="border-left:2px solid {color};padding-left:12px;margin-left:13px">'
-                + "".join(post(p, k, len(posts), color, digest["gloss"], image_src) for k, p in enumerate(posts))
+                + "".join(post(p, k, len(posts), color, digest["gloss"], image_src, nums.get(p["id"])) for k, p in enumerate(posts))
                 + "</section></section>")
     cut = "".join(f'<p style="margin:0 0 2px">{esc(c)}</p>' for c in digest.get("cut", []))
     opening = ""
