@@ -317,7 +317,7 @@ DIGEST_PROFILE=example .venv/bin/python -m unittest discover -s tests
 | 项目 | 说明 |
 |---|---|
 | X | 经非官方 RSSHub 接口，使用登录 Cookie；可能失效、限流、漏帖或返回旧数据，账号也可能受限制 |
-| X 节流 | 同账号请求间等待 12–24 秒，换账号等待 20–34 秒；每轮最多 75 次采集端 RSSHub 请求，X 阶段上限 45 分钟 |
+| X 节流 | 同账号请求间等待 12–24 秒，换账号等待 20–34 秒；每轮最多 90 次采集端 RSSHub 请求，X 阶段上限 45 分钟 |
 | X 覆盖 | 不抓纯转发和回复他人的贴文；跳过识别出的付费订阅专属贴文；分页和 thread 均不保证完整 |
 | Codex | 使用 ChatGPT 账号登录，占用对应套餐的使用额度；重试和 `--fresh` 会增加调用量 |
 | 可选 API | `radar.py --llm` 使用独立 API key，可能产生 API 费用；正常的两阶段定时命令不启用它 |
