@@ -526,7 +526,7 @@ def build(day, steps, root=ROOT, profile=None):
 def date_label(day):
     """Readers see the morning the report arrives, i.e. the end of its 08:00-08:00 window."""
     shown = radar.report_window(day)[1].date()
-    return f"{shown.isoformat()}（周{WEEKDAYS[shown.weekday()]}）"
+    return f"{shown.isoformat()}（周{WEEKDAYS[shown.weekday()]}）" + (" · 周末合刊" if radar.weekend_edition(day) else "")
 
 
 # ---------- delivery ----------
@@ -552,6 +552,9 @@ def main():
     args = parser.parse_args()
     radar.load_dotenv(ROOT / ".env")
     day = date.fromisoformat(args.date) if args.date else (datetime.now(radar.TAIPEI) - timedelta(days=1)).date()
+    if radar.folded_into_monday(day):
+        print(f"{day} is a Saturday: folded into Monday's weekend edition, nothing to send")
+        return 0
 
     try:
         digest = build(day, Steps(ROOT / "data" / "digest-work" / day.isoformat(), fresh=args.fresh))

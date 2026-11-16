@@ -150,6 +150,7 @@ class BuildTests(unittest.TestCase):
         self.assertNotIn("[[", content)
         self.assertIn("RSA</span>：常用公钥加密算法。", content)
         self.assertEqual(result["date_label"], "2026-11-08（周日）")  # the morning the 11-07 window ends
+        self.assertEqual(digest.date_label(date(2026, 11, 15)), "2026-11-16（周一） · 周末合刊")
         self.assertIn("收录 11-07 08:00 至 11-08 08:00", content)
         self.assertEqual(result["cut"], ["@someone：周五部署玩笑——无信息量"])
         self.assertEqual(result["briefs"][0]["who"], "Artificial Analysis")

@@ -387,6 +387,15 @@ class WindowTests(unittest.TestCase):
         self.assertEqual([i["title"] for i in got["items"]], ["first", "last"])
         self.assertEqual(got["status"], "ok_new")
 
+    def test_weekend_folds_into_monday(self):
+        bj = lambda d, h=8: datetime(2026, 11, d, h, tzinfo=radar.TAIPEI)
+        self.assertEqual(radar.report_window(date(2026, 11, 13)), (bj(13), bj(14)))  # Friday: delivered Saturday
+        self.assertEqual(radar.report_window(date(2026, 11, 15)), (bj(14), bj(16)))  # Sunday: Saturday 08:00 to Monday 08:00
+        self.assertTrue(radar.folded_into_monday(date(2026, 11, 14)))
+        with mock.patch.object(sys, "argv", ["radar.py", "--date", "2026-11-14"]),                 mock.patch.object(radar, "run") as run, mock.patch("sys.stdout", mock.MagicMock()):
+            self.assertEqual(radar.main(), 0)
+        run.assert_not_called()
+
 
 
 class ImageTests(unittest.TestCase):

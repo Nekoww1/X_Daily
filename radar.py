@@ -72,9 +72,19 @@ AGENT_ABSTRACT_RE = re.compile(
 REPORT_DAY_STARTS_AT = 8  # Beijing time; 08:00-08:00 keeps a US workday (ET 19:00, PT 16:00 cutoff) in one report
 
 
+def folded_into_monday(day):
+    """Saturday's window (US Friday evening to Saturday) is folded into Monday's weekend edition: no report of its own."""
+    return day.weekday() == 5
+
+
+def weekend_edition(day):
+    """Sunday's report, delivered on Monday, covers Saturday 08:00 to Monday 08:00."""
+    return day.weekday() == 6
+
+
 def report_window(day):
-    start = datetime(day.year, day.month, day.day, REPORT_DAY_STARTS_AT, tzinfo=TAIPEI)
-    return start, start + timedelta(days=1)
+    end = datetime(day.year, day.month, day.day, REPORT_DAY_STARTS_AT, tzinfo=TAIPEI) + timedelta(days=1)
+    return end - timedelta(days=2 if weekend_edition(day) else 1), end
 
 
 def in_window(when, start, end):
@@ -764,6 +774,9 @@ def main():
     parser.add_argument("--llm", action="store_true", help="select and summarize with the LLM (paid API call)")
     args = parser.parse_args()
     day = date.fromisoformat(args.date) if args.date else (datetime.now(TAIPEI) - timedelta(days=1)).date()
+    if folded_into_monday(day):
+        print(f"{day} is a Saturday: folded into Monday's weekend edition, nothing to collect")
+        return 0
 
     report_path, results, candidates, selected = run(day, args.llm)
     failed = [r["source"] for r in results if r["status"] == "failed"]
